@@ -1,0 +1,104 @@
+@page "/new"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject EntryService EntryService
+@inject TagService TagService
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+@inject Whimsy.Data.AppDbContext Db
+
+<PageTitle>New Entry — Whimsy</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h2 class="fw-bold mb-0">New Entry</h2>
+</div>
+
+<div class="entry-form">
+    <div class="mb-3">
+        <input @bind="_title" class="form-control form-control-lg title-input" placeholder="Entry title..." />
+    </div>
+
+    <div class="editor-layout mb-3">
+        <div class="editor-pane">
+            <label class="pane-label">Write (Markdown)</label>
+            <textarea @bind="_content" @bind:event="oninput" @bind:after="UpdatePreview"
+                      class="form-control editor-textarea" placeholder="Write your thoughts..."></textarea>
+        </div>
+        <div class="preview-pane">
+            <label class="pane-label">Preview</label>
+            <div class="preview-content">@((MarkupString)_previewHtml)</div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold small">Mood</label>
+            <select @bind="_selectedMoodId" class="form-select">
+                <option value="">— None —</option>
+                @foreach (var mood in _moods)
+                {
+                    <option value="@mood.Id">@mood.Emoji @mood.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-8">
+            <label class="form-label fw-semibold small">Tags</label>
+            <div class="tag-picker">
+                @foreach (var tag in _tags)
+                {
+                    <label class="tag-toggle @(_selectedTagIds.Contains(tag.Id) ? "active" : "")">
+                        <input type="checkbox" checked="@_selectedTagIds.Contains(tag.Id)"
+                               @onchange="() => ToggleTag(tag.Id)" hidden />
+                        @tag.Name
+                    </label>
+                }
+                @if (!_tags.Any())
+                {
+                    <span class="text-muted small">No tags yet — <a href="/tags">create some</a></span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <button class="btn btn-primary px-4" @onclick="SaveAsync" disabled="@_saving">
+        @(_saving ? "Saving..." : "Save Entry")
+    </button>
+</div>
+
+@code {
+    private string _title = "";
+    private string _content = "";
+    private string _previewHtml = "";
+    private string _selectedMoodId = "";
+    private List<int> _selectedTagIds = new();
+    private List<Mood> _moods = new();
+    private List<Tag> _tags = new();
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _moods = await Db.Moods.ToListAsync();
+        _tags = await TagService.GetAllAsync();
+    }
+
+    private void UpdatePreview() =>
+        _previewHtml = Markdig.Markdown.ToHtml(_content);
+
+    private void ToggleTag(int tagId)
+    {
+        if (_selectedTagIds.Contains(tagId))
+            _selectedTagIds.Remove(tagId);
+        else
+            _selectedTagIds.Add(tagId);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) return;
+        _saving = true;
+        int? moodId = int.TryParse(_selectedMoodId, out var m) ? m : null;
+        await EntryService.CreateAsync(_title, _content, moodId, _selectedTagIds);
+        Nav.NavigateTo("/");
+    }
+}

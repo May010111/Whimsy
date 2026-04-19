@@ -1,0 +1,111 @@
+@page "/search"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject SearchService SearchService
+@inject TagService TagService
+@using Microsoft.EntityFrameworkCore
+@inject Whimsy.Data.AppDbContext Db
+
+<PageTitle>Search — Whimsy</PageTitle>
+
+<h2 class="fw-bold mb-4">🔍 Search</h2>
+
+<div class="search-filters card p-3 mb-4">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Keyword</label>
+            <input @bind="_keyword" class="form-control" placeholder="Search titles and content..." />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">From</label>
+            <input type="date" @bind="_from" class="form-control" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">To</label>
+            <input type="date" @bind="_to" class="form-control" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Tag</label>
+            <select @bind="_tagId" class="form-select">
+                <option value="">— Any —</option>
+                @foreach (var tag in _tags)
+                {
+                    <option value="@tag.Id">@tag.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Mood</label>
+            <select @bind="_moodId" class="form-select">
+                <option value="">— Any —</option>
+                @foreach (var mood in _moods)
+                {
+                    <option value="@mood.Id">@mood.Emoji @mood.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-primary w-100" @onclick="RunSearchAsync">Search</button>
+        </div>
+    </div>
+</div>
+
+@if (_results != null)
+{
+    @if (!_results.Any())
+    {
+        <p class="text-muted">No entries matched your search.</p>
+    }
+    else
+    {
+        <p class="text-muted small mb-3">@_results.Count result(s)</p>
+        <div class="entry-list">
+            @foreach (var entry in _results)
+            {
+                <a href="/entry/@entry.Id" class="entry-card">
+                    <div class="entry-card-header">
+                        <span class="entry-title">@entry.Title</span>
+                        @if (entry.Mood != null)
+                        {
+                            <span class="entry-mood">@entry.Mood.Emoji</span>
+                        }
+                    </div>
+                    <div class="entry-meta">
+                        <span>@entry.CreatedAt.ToString("MMMM dd, yyyy")</span>
+                        @foreach (var et in entry.EntryTags)
+                        {
+                            <span class="tag-badge">@et.Tag?.Name</span>
+                        }
+                    </div>
+                </a>
+            }
+        </div>
+    }
+}
+
+@code {
+    private string _keyword = "";
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _tagId = "";
+    private string _moodId = "";
+    private List<Tag> _tags = new();
+    private List<Mood> _moods = new();
+    private List<JournalEntry>? _results;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tags = await TagService.GetAllAsync();
+        _moods = await Db.Moods.ToListAsync();
+    }
+
+    private async Task RunSearchAsync()
+    {
+        int? tagId = int.TryParse(_tagId, out var t) ? t : null;
+        int? moodId = int.TryParse(_moodId, out var m) ? m : null;
+
+        _results = await SearchService.SearchAsync(
+            string.IsNullOrWhiteSpace(_keyword) ? null : _keyword,
+            _from, _to, tagId, moodId);
+    }
+}

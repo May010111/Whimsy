@@ -1,0 +1,63 @@
+@page "/"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject EntryService EntryService
+
+<PageTitle>Whimsy — Journal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">My Journal</h2>
+    <a href="/new" class="btn btn-primary">✏️ New Entry</a>
+</div>
+
+@if (_entries == null)
+{
+    <p class="text-muted">Loading...</p>
+}
+else if (!_entries.Any())
+{
+    <div class="empty-state">
+        <p>No entries yet.</p>
+        <a href="/new" class="btn btn-outline-primary">Write your first entry</a>
+    </div>
+}
+else
+{
+    <div class="entry-list">
+        @foreach (var entry in _entries)
+        {
+            <a href="/entry/@entry.Id" class="entry-card">
+                <div class="entry-card-header">
+                    <span class="entry-title">@entry.Title</span>
+                    @if (entry.Mood != null)
+                    {
+                        <span class="entry-mood" title="@entry.Mood.Name">@entry.Mood.Emoji</span>
+                    }
+                </div>
+                <div class="entry-meta">
+                    <span>@entry.CreatedAt.ToString("MMMM dd, yyyy")</span>
+                    @if (entry.EntryTags.Any())
+                    {
+                        <span class="entry-tags">
+                            @foreach (var et in entry.EntryTags)
+                            {
+                                <span class="tag-badge">@et.Tag?.Name</span>
+                            }
+                        </span>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(entry.Content))
+                {
+                    <p class="entry-excerpt">@(entry.Content.Length > 120 ? entry.Content[..120] + "…" : entry.Content)</p>
+                }
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<JournalEntry>? _entries;
+
+    protected override async Task OnInitializedAsync() =>
+        _entries = await EntryService.GetAllAsync();
+}

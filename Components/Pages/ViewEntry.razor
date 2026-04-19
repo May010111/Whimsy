@@ -1,0 +1,74 @@
+@page "/entry/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject EntryService EntryService
+@inject NavigationManager Nav
+
+<PageTitle>@(_entry?.Title ?? "Entry") — Whimsy</PageTitle>
+
+@if (_entry == null)
+{
+    <p class="text-muted">Loading...</p>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <a href="/" class="btn btn-sm btn-outline-secondary">← Back</a>
+        <a href="/entry/@_entry.Id/edit" class="btn btn-sm btn-outline-primary">✏️ Edit</a>
+        <button class="btn btn-sm btn-outline-danger ms-auto" @onclick="ConfirmDelete">🗑️ Delete</button>
+    </div>
+
+    @if (_confirmDelete)
+    {
+        <div class="alert alert-danger d-flex align-items-center gap-3">
+            <span>Are you sure you want to delete <strong>@_entry.Title</strong>?</span>
+            <button class="btn btn-danger btn-sm" @onclick="DeleteAsync">Yes, delete</button>
+            <button class="btn btn-secondary btn-sm" @onclick="() => _confirmDelete = false">Cancel</button>
+        </div>
+    }
+
+    <div class="entry-view">
+        <h1 class="entry-view-title">@_entry.Title</h1>
+        <div class="entry-view-meta">
+            <span>@_entry.CreatedAt.ToString("MMMM dd, yyyy · HH:mm")</span>
+            @if (_entry.Mood != null)
+            {
+                <span>@_entry.Mood.Emoji @_entry.Mood.Name</span>
+            }
+            @if (_entry.EntryTags.Any())
+            {
+                @foreach (var et in _entry.EntryTags)
+                {
+                    <span class="tag-badge">@et.Tag?.Name</span>
+                }
+            }
+        </div>
+        <div class="entry-view-body">
+            @((MarkupString)_renderedContent)
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private JournalEntry? _entry;
+    private string _renderedContent = "";
+    private bool _confirmDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _entry = await EntryService.GetByIdAsync(Id);
+        if (_entry != null)
+            _renderedContent = Markdig.Markdown.ToHtml(_entry.Content);
+    }
+
+    private void ConfirmDelete() => _confirmDelete = true;
+
+    private async Task DeleteAsync()
+    {
+        if (_entry != null)
+            await EntryService.DeleteAsync(_entry);
+        Nav.NavigateTo("/");
+    }
+}

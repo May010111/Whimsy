@@ -1,0 +1,88 @@
+@page "/tags"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject TagService TagService
+
+<PageTitle>Tags — Whimsy</PageTitle>
+
+<h2 class="fw-bold mb-4">🏷️ Tags</h2>
+
+<div class="card p-3 mb-4" style="max-width:400px">
+    <label class="form-label small fw-semibold">New Tag</label>
+    <div class="input-group">
+        <input @bind="_newTagName" @onkeydown="OnKeyDown" class="form-control" placeholder="Tag name..." />
+        <button class="btn btn-primary" @onclick="CreateTagAsync">Add</button>
+    </div>
+</div>
+
+@if (_tags.Any())
+{
+    <div class="tag-manager-list">
+        @foreach (var tag in _tags)
+        {
+            <div class="tag-row">
+                @if (_editingId == tag.Id)
+                {
+                    <input @bind="_editName" class="form-control form-control-sm" style="max-width:200px" />
+                    <button class="btn btn-sm btn-success" @onclick="() => SaveRenameAsync(tag)">Save</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">Cancel</button>
+                }
+                else
+                {
+                    <span class="tag-badge-lg">@tag.Name</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => StartEdit(tag)">Rename</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTagAsync(tag)">Delete</button>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    <p class="text-muted">No tags yet.</p>
+}
+
+@code {
+    private List<Tag> _tags = new();
+    private string _newTagName = "";
+    private int? _editingId;
+    private string _editName = "";
+
+    protected override async Task OnInitializedAsync() =>
+        _tags = await TagService.GetAllAsync();
+
+    private async Task CreateTagAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newTagName)) return;
+        await TagService.CreateAsync(_newTagName.Trim());
+        _newTagName = "";
+        _tags = await TagService.GetAllAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CreateTagAsync();
+    }
+
+    private void StartEdit(Tag tag)
+    {
+        _editingId = tag.Id;
+        _editName = tag.Name;
+    }
+
+    private void CancelEdit() => _editingId = null;
+
+    private async Task SaveRenameAsync(Tag tag)
+    {
+        if (!string.IsNullOrWhiteSpace(_editName))
+            await TagService.RenameAsync(tag, _editName.Trim());
+        _editingId = null;
+        _tags = await TagService.GetAllAsync();
+    }
+
+    private async Task DeleteTagAsync(Tag tag)
+    {
+        await TagService.DeleteAsync(tag);
+        _tags = await TagService.GetAllAsync();
+    }
+}
