@@ -6,6 +6,7 @@ using System.Security.Claims;
 
 namespace Whimsy.Pages;
 
+[IgnoreAntiforgeryToken]
 public class LoginModel : PageModel
 {
     public string? Error { get; set; }
